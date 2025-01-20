@@ -84,36 +84,11 @@ body {
   }
 }
 
-@media print {
-  /* Hide everything by default */
-  body * {
-    visibility: hidden;
+@layer base {
+  * {
+    @apply border-border;
   }
-  
-  /* Show only the print content */
-  .print-content,
-  .print-content * {
-    visibility: visible !important;
-  }
-  
-  /* Position the print content at the top of the page */
-  .print-content {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-  }
-  
-  /* Hide any buttons or controls in the print content */
-  .print-content button,
-  .print-content .no-print {
-    display: none !important;
-  }
-  
-  /* Set page margins and size */
-  @page {
-    size: A4;
-    margin: 20mm;
+  body {
+    @apply bg-background text-foreground;
   }
 }
-
