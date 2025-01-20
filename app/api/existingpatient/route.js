@@ -65,7 +65,7 @@ export async function POST(request) {
     // Create new bill
     const newBill = {
       medicines: medicines.map(med => ({
-        medicineName: med.name,
+        medicineName: med.medicineName,
         quantity: parseInt(med.quantity),
         price: parseFloat(med.price),
         total: parseFloat(med.total)

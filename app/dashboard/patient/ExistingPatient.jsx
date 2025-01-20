@@ -6,18 +6,6 @@ import { toast } from 'react-hot-toast'
 import axios from 'axios'
 
 // Sample patient data - replace with your actual data source
-const SAMPLE_PATIENTS = [
-  { id: 'PT123', name: 'John Doe', contact: '1234567890', age: 35 },
-  { id: 'PT456', name: 'Jane Smith', contact: '9876543210', age: 28 },
-]
-
-const SAMPLE_MEDICINES = [
-  { id: 1, name: 'Paracetamol', price: 5.99 },
-  { id: 2, name: 'Amoxicillin', price: 12.99 },
-  { id: 3, name: 'Ibuprofen', price: 7.99 },
-  { id: 4, name: 'Aspirin', price: 4.99 },
-  { id: 5, name: 'Cetirizine', price: 8.99 },
-]
 
 export default function ExistingPatient() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -82,21 +70,47 @@ export default function ExistingPatient() {
   const handleAddMedicine = (e) => {
     e.preventDefault()
     if (!currentMedicine.medicine || currentMedicine.quantity < 1) {
-      setErrors({ medicine: 'Please select a medicine and valid quantity' })
+      toast.error('Please select a medicine and quantity')
       return
     }
 
-    const medicineDetails = medicines.find(m => m._id === currentMedicine.medicine)
-    if (!medicineDetails) return
+    const selectedMedicine = medicines.find(m => m._id === currentMedicine.medicine)
+    if (!selectedMedicine) {
+      toast.error('Selected medicine not found')
+      return
+    }
+
+    // Check if requested quantity is available in stock
+    if (currentMedicine.quantity > selectedMedicine.quantity) {
+      toast.error(`Only ${selectedMedicine.quantity} units available in stock`)
+      return
+    }
+
+    // Check if medicine is already added
+    const existingMedicine = selectedMedicines.find(m => m.id === selectedMedicine._id)
+    if (existingMedicine) {
+      toast.error('This medicine is already added')
+      return
+    }
 
     setSelectedMedicines(prev => [...prev, {
-      ...medicineDetails,
+      id: selectedMedicine._id,
+      medicineName: selectedMedicine.medicineName,
       quantity: parseInt(currentMedicine.quantity),
-      total: medicineDetails.price * parseInt(currentMedicine.quantity)
+      price: selectedMedicine.price,
+      total: selectedMedicine.price * parseInt(currentMedicine.quantity)
     }])
 
-    setCurrentMedicine({ medicine: '', quantity: 1 })
-    setErrors({})
+    setCurrentMedicine({
+      medicine: '',
+      quantity: 1
+    })
+
+    if (errors.medicines) {
+      setErrors(prev => ({ ...prev, medicines: '' }))
+    }
+
+    toast.success('Medicine added to list')
   }
 
   // Remove medicine from bill
@@ -125,13 +139,17 @@ export default function ExistingPatient() {
       setLoading(true)
       const billData = {
         patientId: selectedPatient.patientId,
+        name: selectedPatient.name,
+        age: selectedPatient.age,
+        contact: selectedPatient.contact,
         medicines: selectedMedicines.map(med => ({
-          name: med.medicineName,
-          quantity: med.quantity,
-          price: med.price,
-          total: med.total
+          id: med.id,
+          medicineName: med.medicineName,
+          quantity: parseInt(med.quantity),
+          price: parseFloat(med.price),
+          total: parseFloat(med.total)
         })),
-        totalBill: calculateTotal()
+        totalBill: parseFloat(calculateTotal())
       }
 
       const response = await axios.post('/api/existingpatient', billData)
@@ -144,6 +162,7 @@ export default function ExistingPatient() {
       // Generate PDF
       await generatePDF(response.data.patient)
     } catch (error) {
+      console.error('Bill submission error:', error)
       toast.error(error.response?.data?.error || 'Failed to generate bill')
     } finally {
       setLoading(false)
@@ -198,6 +217,14 @@ export default function ExistingPatient() {
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
     </div>
   )
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount)
+  }
 
   return (
     <div className="bg-white shadow-lg rounded-2xl p-6 space-y-8">
@@ -311,7 +338,7 @@ export default function ExistingPatient() {
                 <option value="">Select Medicine</option>
                 {medicines.map(medicine => (
                   <option key={medicine._id} value={medicine._id}>
-                    {medicine.medicineName} - ${medicine.price}
+                    {medicine.medicineName} - {formatCurrency(medicine.price)}
                   </option>
                 ))}
               </select>
@@ -370,8 +397,8 @@ export default function ExistingPatient() {
                         >
                           <td className="px-6 py-4">{item.medicineName}</td>
                           <td className="px-6 py-4">{item.quantity}</td>
-                          <td className="px-6 py-4">${item.price}</td>
-                          <td className="px-6 py-4">${item.total.toFixed(2)}</td>
+                          <td className="px-6 py-4">{formatCurrency(item.price)}</td>
+                          <td className="px-6 py-4">{formatCurrency(item.total)}</td>
                           <td className="px-6 py-4">
                             <button
                               onClick={() => removeMedicine(index)}
@@ -384,7 +411,7 @@ export default function ExistingPatient() {
                       ))}
                       <tr className="bg-gray-50">
                         <td colSpan="3" className="px-6 py-4 text-right font-bold">Total Bill:</td>
-                        <td className="px-6 py-4 font-bold">${calculateTotal()}</td>
+                        <td className="px-6 py-4 font-bold">{formatCurrency(calculateTotal())}</td>
                         <td></td>
                       </tr>
                     </tbody>
