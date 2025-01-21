@@ -1,53 +1,24 @@
 import { NextResponse } from 'next/server';
-import models from '../../../../lib/schema';
 import connectDB from '../../../../lib/mongodb';
+import models from '../../../../lib/schema';
 
 export async function GET() {
   try {
     await connectDB();
+    console.log('Connected to MongoDB'); // Debug log
 
     // Get total patients
     const totalPatients = await models.Patient.countDocuments();
+    console.log('Total patients:', totalPatients); // Debug log
 
-    // Get low stock medicines
-    const lowStock = await models.MedicineInventory.countDocuments({
-      quantity: { $lte: 10 }
-    });
-
-    // Get expiring medicines (within next month)
+    // Get today's income
     const today = new Date();
-    const oneMonthFromNow = new Date();
-    oneMonthFromNow.setMonth(today.getMonth() + 1);
-    
-    const expiringStock = await models.MedicineInventory.countDocuments({
-      expiryDate: {
-        $gte: today,
-        $lte: oneMonthFromNow
-      }
-    });
-
-    // Calculate total income
-    const allBills = await models.Patient.aggregate([
-      { $unwind: '$bills' },
-      {
-        $group: {
-          _id: null,
-          total: { $sum: '$bills.totalAmount' }
-        }
-      }
-    ]);
-    const totalIncome = allBills[0]?.total || 0;
-
-    // Calculate today's income
     today.setHours(0, 0, 0, 0);
-    const todayBills = await models.Patient.aggregate([
+    const todayIncome = await models.Patient.aggregate([
       { $unwind: '$bills' },
       {
         $match: {
-          'bills.createdAt': {
-            $gte: today,
-            $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
-          }
+          'bills.createdAt': { $gte: today }
         }
       },
       {
@@ -57,20 +28,17 @@ export async function GET() {
         }
       }
     ]);
-    const todayIncome = todayBills[0]?.total || 0;
+    console.log('Today income:', todayIncome); // Debug log
 
-    // Calculate this month's income
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
-    
-    const monthBills = await models.Patient.aggregate([
+    // Get monthly income
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    const monthlyIncome = await models.Patient.aggregate([
       { $unwind: '$bills' },
       {
         $match: {
-          'bills.createdAt': {
-            $gte: firstDayOfMonth,
-            $lte: lastDayOfMonth
-          }
+          'bills.createdAt': { $gte: startOfMonth }
         }
       },
       {
@@ -80,41 +48,86 @@ export async function GET() {
         }
       }
     ]);
-    const monthIncome = monthBills[0]?.total || 0;
+    console.log('Monthly income:', monthlyIncome); // Debug log
 
-    // Get recent transactions with unique IDs
+    // Get monthly income data for the last 6 months
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+    sixMonthsAgo.setDate(1);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
+
+    const monthlyIncomeData = await models.Patient.aggregate([
+      { $unwind: '$bills' },
+      {
+        $match: {
+          'bills.createdAt': { $gte: sixMonthsAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$bills.createdAt' },
+            month: { $month: '$bills.createdAt' }
+          },
+          income: { $sum: '$bills.totalAmount' }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
+    ]);
+    console.log('Monthly income data:', monthlyIncomeData); // Debug log
+
+    // Format monthly data for chart
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const formattedMonthlyData = monthlyIncomeData.map(item => ({
+      month: months[item._id.month - 1],
+      income: item.income
+    }));
+
+    // Get low stock and expiring stock counts
+    const lowStock = await models.MedicineInventory.countDocuments({ quantity: { $lte: 10 } });
+    const oneMonthFromNow = new Date();
+    oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
+    const expiringStock = await models.MedicineInventory.countDocuments({
+      expiryDate: { $lte: oneMonthFromNow }
+    });
+    console.log('Stock counts:', { lowStock, expiringStock }); // Debug log
+
+    // Get recent transactions
     const recentTransactions = await models.Patient.aggregate([
       { $unwind: '$bills' },
       { $sort: { 'bills.createdAt': -1 } },
       { $limit: 10 },
       {
         $project: {
-          id: { $toString: '$_id' }, // Convert ObjectId to string
-          date: '$bills.createdAt',
+          _id: { $toString: '$_id' },
           patientName: '$name',
+          date: '$bills.createdAt',
           amount: '$bills.totalAmount',
-          status: '$bills.status',
-          billId: { $toString: '$bills._id' } // Add unique bill ID
+          status: { $literal: 'Paid' }
         }
       }
     ]);
+    console.log('Recent transactions:', recentTransactions); // Debug log
 
-    return NextResponse.json({
-      stats: {
-        totalPatients,
-        lowStock,
-        expiringStock,
-        totalIncome,
-        todayIncome,
-        monthIncome
-      },
+    const response = {
+      totalPatients,
+      todayIncome: todayIncome[0]?.total || 0,
+      monthlyIncome: monthlyIncome[0]?.total || 0,
+      lowStock,
+      expiringStock,
+      monthlyIncomeData: formattedMonthlyData,
       recentTransactions
-    });
+    };
+    console.log('Final response:', response); // Debug log
 
+    return NextResponse.json(response);
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
+    console.error('Dashboard stats error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch dashboard stats' },
+      { 
+        error: 'Failed to fetch dashboard statistics',
+        details: error.message 
+      },
       { status: 500 }
     );
   }

@@ -26,6 +26,15 @@ export async function POST(request) {
       address
     } = data;
 
+    // Check for duplicate contact number
+    const existingPatient = await models.Patient.findOne({ contact });
+    if (existingPatient) {
+      return NextResponse.json(
+        { error: 'A patient with this contact number already exists' },
+        { status: 400 }
+      );
+    }
+
     // Check stock availability for all medicines
     const stockChecks = await Promise.all(medicines.map(async (med) => {
       const medicineInDb = await models.MedicineInventory.findById(med.id);

@@ -309,7 +309,7 @@ export default function MedicinePage() {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-gray-900">
-                            ${medicine.price.toFixed(2)}
+                          ₹{medicine.price.toFixed(2)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <div className="flex space-x-2">

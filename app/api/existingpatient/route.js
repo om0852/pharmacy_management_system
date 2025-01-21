@@ -16,13 +16,19 @@ export async function GET(request) {
       );
     }
 
-    // Search by patientId or contact number
+    // Search by patientId or contact number and sort bills by date in descending order
     const patient = await models.Patient.findOne({
       $or: [
         { patientId: searchQuery },
         { contact: searchQuery }
       ]
-    }).sort({ createdAt: -1 });
+    }).then(patient => {
+      if (patient) {
+        // Sort bills array in descending order by createdAt
+        patient.bills.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }
+      return patient;
+    });
 
     if (!patient) {
       return NextResponse.json(

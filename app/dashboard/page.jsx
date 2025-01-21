@@ -54,34 +54,64 @@ const modules = [
 export default function Dashboard() {
   const [stats, setStats] = useState({
     totalPatients: 0,
+    todayIncome: 0,
+    monthlyIncome: 0,
     lowStock: 0,
     expiringStock: 0,
-    totalIncome: 0,
-    todayIncome: 0,
-    monthIncome: 0
+    recentTransactions: []
   })
   const [dateRange, setDateRange] = useState([null, null])
   const [startDate, endDate] = dateRange
-  const [recentTransactions, setRecentTransactions] = useState([])
+  const [chartData, setChartData] = useState({
+    labels: [],
+    datasets: []
+  })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true)
+        console.log('Fetching dashboard data...') // Debug log
+        const response = await axios.get('/api/dashboard/stats')
+        console.log('Dashboard data received:', response.data) // Debug log
+
+        setStats({
+          totalPatients: response.data.totalPatients || 0,
+          todayIncome: response.data.todayIncome || 0,
+          monthlyIncome: response.data.monthlyIncome || 0,
+          lowStock: response.data.lowStock || 0,
+          expiringStock: response.data.expiringStock || 0,
+          recentTransactions: response.data.recentTransactions || []
+        })
+
+        // Prepare chart data
+       
+       
+        const monthlyData = response.data.monthlyIncomeData || []
+        setChartData({
+          labels: monthlyData.map(item => item.month),
+          datasets: [
+            {
+              label: 'Monthly Income',
+              data: monthlyData.map(item => item.income),
+              fill: false,
+              borderColor: 'rgb(99, 102, 241)',
+              backgroundColor: 'rgba(99, 102, 241, 0.5)',
+              tension: 0.4
+            }
+          ]
+        })
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error)
+        toast.error(error.response?.data?.error || 'Failed to fetch dashboard data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
     fetchDashboardData()
   }, [])
-
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true)
-      const response = await axios.get('/api/dashboard/stats')
-      setStats(response.data.stats)
-      setRecentTransactions(response.data.recentTransactions)
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error)
-      toast.error('Failed to load dashboard data')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleDateRangeChange = async (update) => {
     setDateRange(update)
@@ -120,41 +150,56 @@ export default function Dashboard() {
     })
   }
 
-  // Chart data
-  const chartData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-    datasets: [
-      {
-        label: 'Monthly Income',
-        data: [12000, 19000, 15000, 25000, 22000, 30000],
-        fill: false,
-        borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top',
+      },
+      title: {
+        display: true,
+        text: 'Monthly Income Trend'
       }
-    ]
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          callback: function(value) {
+            return formatCurrency(value)
+          }
+        }
+      }
+    }
   }
 
   const statCards = [
     { title: 'Total Patients', value: stats.totalPatients, icon: FiUsers, color: 'from-blue-500 to-blue-600' },
     { title: 'Low Stock Items', value: stats.lowStock, icon: FiAlertCircle, color: 'from-red-500 to-red-600' },
     { title: 'Expiring Next Month', value: stats.expiringStock, icon: FiPackage, color: 'from-yellow-500 to-yellow-600' },
-    { title: 'Total Income', value: formatCurrency(stats.totalIncome), icon: FiDollarSign, color: 'from-green-500 to-green-600' },
-    { title: "Today's Income", value: formatCurrency(stats.todayIncome), icon: FiClock, color: 'from-purple-500 to-purple-600' },
-    { title: 'Monthly Income', value: formatCurrency(stats.monthIncome), icon: FiCalendar, color: 'from-indigo-500 to-indigo-600' }
+    { title: 'Today\'s Income', value: formatCurrency(stats.todayIncome), icon: FiClock, color: 'from-purple-500 to-purple-600' },
+    { title: 'Monthly Income', value: formatCurrency(stats.monthlyIncome), icon: FiCalendar, color: 'from-indigo-500 to-indigo-600' }
   ]
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex justify-center items-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-6">
+      <div className="max-w-7xl mx-auto">
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
+          className="text-center mb-8"
         >
           <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            Medical Management Dashboard
+            Dashboard Overview
           </h1>
-          <p className="mt-2 text-gray-600">Overview of your pharmacy's performance</p>
         </motion.div>
 
         {/* Quick Access Modules */}
@@ -318,17 +363,17 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* Income Chart */}
+        {/* Income Chart
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="bg-white rounded-2xl shadow-xl p-6 mb-8"
         >
           <h2 className="text-xl font-semibold mb-4">Income Trends</h2>
-          <div className="h-[300px]">
-            <Line data={chartData} options={{ maintainAspectRatio: false }} />
+          <div className="h-[400px]">
+            <Line data={chartData} options={chartOptions} />
           </div>
-        </motion.div>
+        </motion.div> */}
 
         {/* Recent Transactions */}
         <motion.div
@@ -348,9 +393,9 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {recentTransactions.map((transaction) => (
+                {stats.recentTransactions.map((transaction, index) => (
                   <motion.tr
-                    key={`${transaction.id}-${transaction.billId}`}
+                    key={transaction._id || `transaction-${index}`}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.05 }}
@@ -365,7 +410,7 @@ export default function Dashboard() {
                           ? 'bg-green-100 text-green-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
-                        {transaction.status}
+                        {transaction.status || 'Paid'}
                       </span>
                     </td>
                   </motion.tr>

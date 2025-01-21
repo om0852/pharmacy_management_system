@@ -20,6 +20,7 @@ export default function ExistingPatient() {
   const [loading, setLoading] = useState(false)
   const [medicines, setMedicines] = useState([])
   const [searchResults, setSearchResults] = useState([])
+  const [showSuccess, setShowSuccess] = useState(false)
 
   const router = useRouter()
 
@@ -154,10 +155,14 @@ export default function ExistingPatient() {
 
       const response = await axios.post('/api/existingpatient', billData)
       toast.success('Bill generated successfully')
+      setShowSuccess(true)
       
       // Clear form
       setSelectedMedicines([])
       setCurrentMedicine({ medicine: '', quantity: 1 })
+      
+      // Refresh medicine data
+      await fetchMedicines()
       
       // Generate PDF
       await generatePDF(response.data.patient)
@@ -228,15 +233,27 @@ export default function ExistingPatient() {
 
   return (
     <div className="bg-white shadow-lg rounded-2xl p-6 space-y-8">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center"
-      >
-        <h2 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-          Existing Patient Billing
-        </h2>
-      </motion.div>
+      <div className="flex justify-between items-center mb-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center flex-1"
+        >
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            Existing Patient Billing
+          </h2>
+        </motion.div>
+        <motion.button
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => router.push('/dashboard')}
+          className="px-4 py-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-2"
+        >
+          <span>← Back to Dashboard</span>
+        </motion.button>
+      </div>
 
       <div className="space-y-6">
         <div className="flex gap-4">

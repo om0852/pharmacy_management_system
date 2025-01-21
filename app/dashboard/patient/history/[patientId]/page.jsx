@@ -76,14 +76,11 @@ export default function PatientHistory() {
     const fetchPatientHistory = async () => {
       try {
         setLoading(true)
-        const response = await axios.get(`/api/patient/history/${params.patientId}`)
-        setPatient(response.data.patient)
+        const response = await axios.get(`/api/existingpatient?search=${params.patientId}`)
+        setPatient(response.data)
       } catch (error) {
         console.error('Error fetching patient history:', error)
-        toast.error(error.response?.data?.error || 'Failed to fetch patient history')
-        if (error.response?.status === 404) {
-          router.push('/dashboard/patient')
-        }
+        toast.error('Failed to fetch patient history')
       } finally {
         setLoading(false)
       }
@@ -102,6 +99,14 @@ export default function PatientHistory() {
       hour: '2-digit',
       minute: '2-digit'
     })
+  }
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0
+    }).format(amount)
   }
 
   const handlePrint = async (bill) => {
@@ -178,15 +183,26 @@ export default function PatientHistory() {
 
   if (!patient) {
     return (
-      <div className="text-center py-12">
-        <h2 className="text-2xl font-semibold text-gray-700">Patient not found</h2>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+        <div className="max-w-7xl mx-auto">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center text-indigo-600 hover:text-indigo-800 transition-colors mb-4"
+          >
+            <FiArrowLeft className="mr-2" />
+            Back
+          </button>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-800">Patient not found</h1>
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-6">
-      <div className="max-w-6xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      <div className="max-w-7xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -194,92 +210,102 @@ export default function PatientHistory() {
         >
           <button
             onClick={() => router.back()}
-            className="flex items-center text-indigo-600 hover:text-indigo-800 transition-colors"
+            className="flex items-center text-indigo-600 hover:text-indigo-800 transition-colors mb-4"
           >
             <FiArrowLeft className="mr-2" />
-            Back to Patients
+            Back to Patient
           </button>
+          <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+            <h1 className="text-3xl font-bold text-gray-800">Patient History</h1>
+            <div className="mt-4">
+              <p className="text-gray-600">Name: {patient.name}</p>
+              <p className="text-gray-600">Patient ID: {patient.patientId}</p>
+              <p className="text-gray-600">Contact: {patient.contact}</p>
+              <p className="text-gray-600">Age: {patient.age}</p>
+            </div>
+          </div>
         </motion.div>
 
-          <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-xl p-6 mb-8"
-        >
-          <div className="grid md:grid-cols-2 gap-6">
-              <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">Patient Information</h2>
-              <div className="space-y-2">
-                <p><span className="font-medium">Patient ID:</span> {patient.patientId}</p>
-                <p><span className="font-medium">Name:</span> {patient.name}</p>
-                <p><span className="font-medium">Age:</span> {patient.age}</p>
-                <p><span className="font-medium">Contact:</span> {patient.contact}</p>
-                  </div>
-                  </div>
-                  <div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">Billing Summary</h2>
-              <div className="space-y-2">
-                <p><span className="font-medium">Total Bills:</span> {patient.bills.length}</p>
-                <p><span className="font-medium">Total Amount:</span> ${patient.totalBills.toFixed(2)}</p>
-                  </div>
-              </div>
-            </div>
-          </motion.div>
-
         <div className="space-y-6">
-          <h3 className="text-xl font-bold text-gray-800">Billing History</h3>
-          <AnimatePresence>
-            {patient.bills.map((bill, index) => (
-        <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="bg-white/80 backdrop-blur-sm rounded-xl shadow-lg p-6"
-              >
-                <div className="flex justify-between items-start mb-4">
-                <div>
-                    <p className="text-sm text-gray-500">{formatDate(bill.createdAt)}</p>
-                    <p className="font-medium text-lg">Total: ${bill.totalAmount.toFixed(2)}</p>
-                </div>
-                  <div className="flex space-x-2">
+          {patient.bills.map((bill, index) => (
+            <motion.div
+              key={bill._id || index}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+              className="bg-white rounded-2xl shadow-xl overflow-hidden"
+            >
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">
+                      Bill #{patient.bills.length - index}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      {formatDate(bill.createdAt)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
                     <motion.button
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       onClick={() => handlePrint(bill)}
-                      className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                      className="flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                     >
                       <FiPrinter className="mr-2" />
                       Print
                     </motion.button>
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => handleDownload(bill)}
+                      className="flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      <FiDownload className="mr-2" />
+                      Download
+                    </motion.button>
+                  </div>
                 </div>
-              </div>
 
                 <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Medicine</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                    </tr>
-                  </thead>
-                    <tbody className="divide-y divide-gray-200">
-                    {bill.medicines.map((medicine, idx) => (
-                        <tr key={idx}>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {bill.medicines.map((medicine, medIndex) => (
+                        <tr key={medIndex} className="hover:bg-gray-50">
                           <td className="px-6 py-4">{medicine.medicineName}</td>
                           <td className="px-6 py-4">{medicine.quantity}</td>
-                          <td className="px-6 py-4">${medicine.price.toFixed(2)}</td>
-                          <td className="px-6 py-4">${medicine.total.toFixed(2)}</td>
+                          <td className="px-6 py-4">{formatCurrency(medicine.price)}</td>
+                          <td className="px-6 py-4">{formatCurrency(medicine.total)}</td>
                         </tr>
                       ))}
-                  </tbody>
-                </table>
+                      <tr className="bg-gray-50">
+                        <td colSpan="3" className="px-6 py-4 text-right font-bold">Total Amount:</td>
+                        <td className="px-6 py-4 font-bold">{formatCurrency(bill.totalAmount)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-4 text-sm text-gray-500">
+                  <span className={`px-2 py-1 rounded-full ${
+                    bill.status === 'Paid' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {bill.status}
+                  </span>
+                </div>
               </div>
             </motion.div>
           ))}
-          </AnimatePresence>
         </div>
       </div>
     </div>
