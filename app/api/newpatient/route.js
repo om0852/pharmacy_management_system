@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import models from '../../../lib/schema';
-import connectDB from '../../../lib/mongodb';
+import {connectDB} from '../../../lib/mongodb';
 import nodemailer from 'nodemailer';
 
 const transporter = nodemailer.createTransport({

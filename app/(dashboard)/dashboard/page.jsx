@@ -51,6 +51,92 @@ const modules = [
   },
 ]
 
+const getBubbleStyle = (index) => {
+  // Use deterministic values based on index
+  const positions = [
+    { left: '10%', top: '20%' },
+    { left: '20%', top: '80%' },
+    { left: '30%', top: '40%' },
+    { left: '40%', top: '60%' },
+    { left: '50%', top: '30%' },
+    { left: '60%', top: '70%' },
+    { left: '70%', top: '25%' },
+    { left: '80%', top: '65%' },
+    { left: '90%', top: '35%' },
+    { left: '15%', top: '55%' },
+    { left: '25%', top: '15%' },
+    { left: '35%', top: '85%' },
+    { left: '45%', top: '45%' },
+    { left: '55%', top: '75%' },
+    { left: '85%', top: '90%' }
+  ];
+
+  const sizes = [40, 50, 60, 70, 80];
+  const durations = [15, 18, 20, 22, 25];
+  const delays = [0, 1, 2, 3, 4];
+
+  // Define different color combinations for variety
+  const colors = [
+    { start: '86, 97, 179', end: '168, 85, 247' },    // Blue to Purple
+    { start: '59, 130, 246', end: '147, 51, 234' },   // Bright Blue to Purple
+    { start: '236, 72, 153', end: '159, 122, 234' },  // Pink to Purple
+    { start: '88, 28, 135', end: '59, 130, 246' },    // Deep Purple to Blue
+    { start: '219, 39, 119', end: '124, 58, 237' }    // Pink to Violet
+  ];
+
+  const position = positions[index % positions.length];
+  const size = sizes[index % sizes.length];
+  const duration = durations[index % durations.length];
+  const delay = delays[index % delays.length];
+  const color = colors[index % colors.length];
+  const baseOpacity = ((index % 3) + 2) / 10; // Values between 0.2 and 0.4
+
+  return {
+    left: position.left,
+    top: position.top,
+    width: `${size}px`,
+    height: `${size}px`,
+    background: `linear-gradient(135deg, 
+      rgba(${color.start}, ${baseOpacity}), 
+      rgba(${color.end}, ${baseOpacity}))`,
+    animationDuration: `${duration}s`,
+    animationDelay: `${delay}s`,
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)'
+  };
+};
+
+const DashboardBubbles = () => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  return (
+    <div className="dashboard-bubbles fixed inset-0 pointer-events-none">
+      {[...Array(15)].map((_, i) => (
+        <motion.div
+          key={i}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ 
+            duration: 0.5, 
+            delay: i * 0.1,
+            ease: "easeOut"
+          }}
+          className="dashboard-bubble absolute rounded-full"
+          style={getBubbleStyle(i)}
+        />
+      ))}
+    </div>
+  );
+};
+
 export default function Dashboard() {
   const [stats, setStats] = useState({
     totalPatients: 0,
@@ -190,15 +276,16 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-6 relative overflow-hidden">
+      <DashboardBubbles />
+      <div className="max-w-7xl mx-auto relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
           <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            Dashboard Overview
+          Medicare Dashboard Overview
           </h1>
         </motion.div>
 
@@ -420,6 +507,35 @@ export default function Dashboard() {
           </div>
         </motion.div>
       </div>
+      <style jsx global>{`
+        @keyframes dashboardFloat {
+          0% {
+            transform: translate(0, 0) rotate(0deg);
+          }
+          33% {
+            transform: translate(30px, -30px) rotate(120deg);
+          }
+          66% {
+            transform: translate(-20px, 20px) rotate(240deg);
+          }
+          100% {
+            transform: translate(0, 0) rotate(360deg);
+          }
+        }
+        
+        .dashboard-bubble {
+          animation: dashboardFloat infinite ease-in-out;
+          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+        }
+        
+        .dashboard-bubble:nth-child(even) {
+          animation-direction: reverse;
+        }
+        
+        .dashboard-bubbles {
+          z-index: 1;
+        }
+      `}</style>
     </div>
   )
 }

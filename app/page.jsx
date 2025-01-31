@@ -1,13 +1,13 @@
 "use client"
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { toast } from 'react-hot-toast'
 
 export default function LoginPage() {
-  const [loginMethod, setLoginMethod] = useState('username')
+  const router = useRouter()
   const [formData, setFormData] = useState({
-    username: '',
-    mobileNumber: '',
+    email: '',
     password: ''
   })
   const [errors, setErrors] = useState({})
@@ -16,24 +16,14 @@ export default function LoginPage() {
   const validateForm = () => {
     const newErrors = {}
     
-    if (loginMethod === 'username') {
-      if (!formData.username) {
-        newErrors.username = 'Username is required'
-      } else if (formData.username.length < 3) {
-        newErrors.username = 'Username must be at least 3 characters'
-      }
-    } else {
-      if (!formData.mobileNumber) {
-        newErrors.mobileNumber = 'Mobile number is required'
-      } else if (!/^\d{10}$/.test(formData.mobileNumber)) {
-        newErrors.mobileNumber = 'Please enter a valid 10-digit mobile number'
-      }
+    if (!formData.email) {
+      newErrors.email = 'Email is required'
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address'
     }
 
     if (!formData.password) {
       newErrors.password = 'Password is required'
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters'
     }
 
     setErrors(newErrors)
@@ -45,9 +35,15 @@ export default function LoginPage() {
     if (!validateForm()) return
 
     setIsLoading(true)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    console.log('Login submitted', { loginMethod, ...formData })
+    
+    // Check credentials
+    if (formData.email === 'admin@gmail.com' && formData.password === 'admin@0088') {
+      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API delay
+      router.push('/dashboard')
+    } else {
+      toast.error('Invalid email or password')
+    }
+    
     setIsLoading(false)
   }
 
@@ -89,82 +85,26 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Login Method
+              Email Address
             </label>
-            <motion.div
-              whileTap={{ scale: 0.98 }}
-              className="relative"
-            >
-              <select
-                value={loginMethod}
-                onChange={(e) => setLoginMethod(e.target.value)}
-                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm"
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleInputChange}
+              className={`w-full px-4 py-2 rounded-lg border ${errors.email ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm`}
+              placeholder="Enter your email"
+            />
+            {errors.email && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-1 text-sm text-red-500"
               >
-                <option value="username">Username</option>
-                <option value="mobile">Mobile Number</option>
-              </select>
-            </motion.div>
-          </div>
-
-          <AnimatePresence mode='wait'>
-            {loginMethod === 'username' ? (
-              <motion.div
-                key="username"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-2 rounded-lg border ${errors.username ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm`}
-                />
-                {errors.username && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="mt-1 text-sm text-red-500"
-                  >
-                    {errors.username}
-                  </motion.p>
-                )}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="mobile"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3 }}
-              >
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Mobile Number
-                </label>
-                <input
-                  type="tel"
-                  name="mobileNumber"
-                  value={formData.mobileNumber}
-                  onChange={handleInputChange}
-                  className={`w-full px-4 py-2 rounded-lg border ${errors.mobileNumber ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm`}
-                />
-                {errors.mobileNumber && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="mt-1 text-sm text-red-500"
-                  >
-                    {errors.mobileNumber}
-                  </motion.p>
-                )}
-              </motion.div>
+                {errors.email}
+              </motion.p>
             )}
-          </AnimatePresence>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -176,6 +116,7 @@ export default function LoginPage() {
               value={formData.password}
               onChange={handleInputChange}
               className={`w-full px-4 py-2 rounded-lg border ${errors.password ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm`}
+              placeholder="Enter your password"
             />
             {errors.password && (
               <motion.p
@@ -202,27 +143,13 @@ export default function LoginPage() {
                 className="flex items-center justify-center"
               >
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                Logging in...
+                Signing in...
               </motion.div>
             ) : (
-              "Login"
+              "Sign In"
             )}
           </motion.button>
         </form>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-6 text-center"
-        >
-          <Link 
-            href="/dashboard" 
-            className="text-sm text-indigo-600 hover:text-indigo-500 transition-colors duration-200"
-          >
-            Go to Dashboard (Demo)
-          </Link>
-        </motion.div>
       </motion.div>
     </div>
   )

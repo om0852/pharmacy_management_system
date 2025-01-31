@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import models from '../../../lib/schema';
-import connectDB from '../../../lib/mongodb';
+import {connectDB }from '../../../lib/mongodb';
 
 // Get all medicines or search medicines
 export async function GET(request) {
