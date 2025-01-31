@@ -3,9 +3,10 @@ import  { Metadata } from 'next'
 import './globals.css'
 
 export const metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'Medicare ',
+  description: 'Created by Medicare',
 }
+
 export default function RootLayout({ children }) {
   return (
     <html>
