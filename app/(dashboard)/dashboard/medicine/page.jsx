@@ -214,6 +214,7 @@ export default function MedicinePage() {
                   <option value="syrup">Syrup</option>
                   <option value="injection">Injection</option>
                   <option value="cream">Cream</option>
+                  <option value="saline bottle">Saline Bottle</option>
                 </select>
               </div>
 

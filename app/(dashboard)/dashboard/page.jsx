@@ -37,7 +37,8 @@ const modules = [
     icon: '👤',
     actions: [
       { name: 'New Patient', href: '/dashboard/patient/', description: 'Register a new patient' },
-      { name: 'Existing Patient', href: '/dashboard/patient/', description: 'Manage existing patients' }
+      { name: 'Existing Patient', href: '/dashboard/patient/?tab=existing', description: 'Manage existing patients' },
+      { name: 'Patient List', href: '/dashboard/patient/list', description: 'View and manage all patients' }
     ]
   },
   { 

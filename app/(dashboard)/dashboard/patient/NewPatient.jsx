@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
+import jsPDF from 'jspdf'
+import 'jspdf-autotable'
 
 import axios from 'axios'
 
@@ -13,6 +15,7 @@ export default function NewPatient() {
     name: '',
     age: '',
     contact: '',
+    doctor: '',
   })
   const [selectedMedicines, setSelectedMedicines] = useState([])
   const [currentMedicine, setCurrentMedicine] = useState({
@@ -22,29 +25,53 @@ export default function NewPatient() {
   const [isLoading, setIsLoading] = useState(true)
   const [showSuccess, setShowSuccess] = useState(false)
   const router = useRouter()
+  const [medicineSearch, setMedicineSearch] = useState('')
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [showCustomDoctor, setShowCustomDoctor] = useState(false)
+  const [customDoctorName, setCustomDoctorName] = useState('')
   
-
-useEffect(() => {
-  const fetchMedicines = async () => {
-    setIsLoading(true)
-    try {
-      const response = await axios.get('/api/medicine')
-      console.log('Fetched medicines:', response.data)
-      if (Array.isArray(response.data)) {
-        setMedicineData(response.data)
-      } else {
-        //console.error('Invalid medicine data format:', response.data)
-        toast.error('Failed to load medicines')
+  const filteredMedicines = medicineData.filter(medicine => 
+    medicine.medicineName.toLowerCase().includes(medicineSearch.toLowerCase())
+  )
+  
+  const doctors = [
+    { id: 'dr1', name: 'Dr. John Smith' },
+    { id: 'dr2', name: 'Dr. Sarah Johnson' },
+    { id: 'dr3', name: 'Dr. Michael Brown' },
+  ]
+  
+  useEffect(() => {
+    const fetchMedicines = async () => {
+      setIsLoading(true)
+      try {
+        const response = await axios.get('/api/medicine')
+        console.log('Fetched medicines:', response.data)
+        if (Array.isArray(response.data)) {
+          setMedicineData(response.data)
+        } else {
+          //console.error('Invalid medicine data format:', response.data)
+          toast.error('Failed to load medicines')
+        }
+      } catch (error) {
+        //console.error('Error fetching medicines:', error)
+        toast.error('Failed to fetch medicines')
+      } finally {
+        setIsLoading(false)
       }
-    } catch (error) {
-      //console.error('Error fetching medicines:', error)
-      toast.error('Failed to fetch medicines')
-    } finally {
-      setIsLoading(false)
     }
-  }
-  fetchMedicines()
-}, [showSuccess])
+    fetchMedicines()
+  }, [showSuccess])
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isDropdownOpen && !event.target.closest('.medicine-dropdown')) {
+        setIsDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isDropdownOpen])
 
   const [errors, setErrors] = useState({})
 
@@ -56,6 +83,9 @@ useEffect(() => {
       newErrors.contact = 'Contact number is required'
     } else if (!/^\d{10}$/.test(formData.contact)) {
       newErrors.contact = 'Please enter a valid 10-digit contact number'
+    }
+    if (!formData.doctor) {
+      newErrors.doctor = 'Please select or enter a doctor'
     }
     if (selectedMedicines.length === 0) {
       newErrors.medicines = 'Please add at least one medicine'
@@ -72,70 +102,163 @@ useEffect(() => {
         medicines: selectedMedicines,
         totalBill: calculateTotal(),
       })
-    const storeNewPatient = async () => {
-      try {
-        const response = await axios.post('/api/newpatient', {
-          ...formData,
-          medicines: selectedMedicines.map(med => ({
-            id: med.id,
-            name: med.name,
-            quantity: parseInt(med.quantity),
-            price: parseFloat(med.price),
-            total: parseFloat(med.total)
-          })),
-          totalBill: parseFloat(calculateTotal())
-        });
-        console.log('New patient stored successfully:', response.data);
-        
-        // Show success message
-        toast.success('Patient registered successfully');
-        setShowSuccess(true);
-        
-        // Clear form data and generate new patient ID
-        setFormData({
-          patientId: 'PT' + Math.random().toString(36).substr(2, 8).toUpperCase(),
-          name: '',
-          age: '',
-          contact: '',
-        });
-        
-        // Clear selected medicines
-        setSelectedMedicines([]);
-        
-        // Reset current medicine selection
-        setCurrentMedicine({
-          medicine: '',
-          quantity: 1
-        });
-        
-        // Clear any errors
-        setErrors({});
+      const storeNewPatient = async () => {
+        try {
+          const response = await axios.post('/api/newpatient', {
+            ...formData,
+            medicines: selectedMedicines.map(med => ({
+              id: med.id,
+              name: med.name,
+              quantity: parseInt(med.quantity),
+              price: parseFloat(med.price),
+              total: parseFloat(med.total)
+            })),
+            totalBill: parseFloat(calculateTotal())
+          });
+          console.log('New patient stored successfully:', response.data);
+          
+          // Generate and download bill
+          const doc = new jsPDF({
+            orientation: 'landscape',
+            unit: 'mm',
+            format: 'a4'
+          });
 
-        // Refresh medicine data
-        const fetchMedicines = async () => {
-          setIsLoading(true)
-          try {
-            const response = await axios.get('/api/medicine')
-            if (Array.isArray(response.data)) {
-              setMedicineData(response.data)
-            } else {
-              toast.error('Failed to load medicines')
+          // Add Medicare header
+          doc.setFontSize(24);
+          doc.setTextColor(79, 70, 229); // #4f46e5
+          doc.text('Medicare', 140, 20, { align: 'center' });
+          doc.setFontSize(12);
+          doc.setTextColor(107, 114, 128); // #6b7280
+          doc.text('Your Trusted Healthcare Partner', 140, 28, { align: 'center' });
+
+          // Add patient information
+          doc.setFontSize(14);
+          doc.setTextColor(79, 70, 229);
+          doc.text('Patient Information', 20, 45);
+          doc.setFontSize(10);
+          doc.setTextColor(0, 0, 0);
+          doc.text(`Patient ID: ${formData.patientId}`, 20, 55);
+          doc.text(`Name: ${formData.name}`, 20, 62);
+          doc.text(`Age: ${formData.age}`, 20, 69);
+          doc.text(`Contact: ${formData.contact}`, 20, 76);
+          doc.text(`Doctor: ${formData.doctor}`, 20, 83);
+
+          // Add bill information
+          doc.setFontSize(14);
+          doc.setTextColor(79, 70, 229);
+          doc.text('Bill Information', 140, 45);
+          doc.setFontSize(10);
+          doc.setTextColor(0, 0, 0);
+          doc.text(`Bill ID: ${response.data._id}`, 140, 55);
+          doc.text(`Date: ${new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          })}`, 140, 62);
+          doc.text('Status: Paid', 140, 69);
+
+          // Add medicines table
+          const tableData = selectedMedicines.map(med => [
+            med.name,
+            med.quantity.toString(),
+            formatCurrency(med.price),
+            formatCurrency(med.total)
+          ]);
+
+          // Add total row
+          tableData.push(['', '', 'Total Amount:', formatCurrency(calculateTotal())]);
+
+          doc.autoTable({
+            startY: 95,
+            head: [['Medicine', 'Quantity', 'Price', 'Total']],
+            body: tableData,
+            headStyles: {
+              fillColor: [79, 70, 229],
+              textColor: 255,
+              fontSize: 10,
+              fontStyle: 'bold'
+            },
+            styles: {
+              fontSize: 10,
+              cellPadding: 5
+            },
+            columnStyles: {
+              0: { cellWidth: 80 },
+              1: { cellWidth: 30 },
+              2: { cellWidth: 40 },
+              3: { cellWidth: 40 }
+            },
+            footStyles: {
+              fillColor: [243, 244, 246],
+              textColor: 0,
+              fontSize: 10,
+              fontStyle: 'bold'
             }
-          } catch (error) {
-            toast.error('Failed to fetch medicines')
-          } finally {
-            setIsLoading(false)
-          }
-        }
-        await fetchMedicines();
-        
-      } catch (error) {
-        console.error('Error storing new patient:', error);
-        toast.error(error.response?.data?.error || 'Failed to register patient');
-      }
-    };
+          });
 
-    storeNewPatient();
+          // Add footer
+          const pageHeight = doc.internal.pageSize.height;
+          doc.setFontSize(10);
+          doc.setTextColor(107, 114, 128);
+          doc.text('Thank you for choosing Medicare', 140, pageHeight - 20, { align: 'center' });
+          doc.text('For any queries, please contact us at: support@medicare.com', 140, pageHeight - 15, { align: 'center' });
+
+          // Download the PDF
+          doc.save(`bill-${formData.patientId}.pdf`);
+          
+          // Show success message
+          toast.success('Patient registered successfully');
+          setShowSuccess(true);
+          
+          // Clear form data and generate new patient ID
+          setFormData({
+            patientId: 'PT' + Math.random().toString(36).substr(2, 8).toUpperCase(),
+            name: '',
+            age: '',
+            contact: '',
+            doctor: '',
+          });
+          
+          // Clear selected medicines
+          setSelectedMedicines([]);
+          
+          // Reset current medicine selection
+          setCurrentMedicine({
+            medicine: '',
+            quantity: 1
+          });
+          
+          // Clear any errors
+          setErrors({});
+
+          // Refresh medicine data
+          const fetchMedicines = async () => {
+            setIsLoading(true)
+            try {
+              const response = await axios.get('/api/medicine')
+              if (Array.isArray(response.data)) {
+                setMedicineData(response.data)
+              } else {
+                toast.error('Failed to load medicines')
+              }
+            } catch (error) {
+              toast.error('Failed to fetch medicines')
+            } finally {
+              setIsLoading(false)
+            }
+          }
+          await fetchMedicines();
+          
+        } catch (error) {
+          console.error('Error storing new patient:', error);
+          toast.error(error.response?.data?.error || 'Failed to register patient');
+        }
+      };
+
+      storeNewPatient();
     }
   }
 
@@ -210,8 +333,31 @@ useEffect(() => {
     }).format(amount)
   }
 
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSubmit(e)
+    }
+  }
+
+  const handleDoctorChange = (e) => {
+    const value = e.target.value;
+    if (value === 'custom') {
+      setShowCustomDoctor(true);
+      setFormData(prev => ({ ...prev, doctor: '' }));
+    } else {
+      setShowCustomDoctor(false);
+      setCustomDoctorName('');
+      setFormData(prev => ({ ...prev, doctor: value }));
+    }
+  };
+
+  const handleCustomDoctorChange = (e) => {
+    setCustomDoctorName(e.target.value);
+    setFormData(prev => ({ ...prev, doctor: e.target.value }));
+  };
+
   return (
-    <div className="bg-white shadow-lg rounded-2xl p-6 space-y-8">
+    <div className="bg-white shadow-lg rounded-2xl p-8 space-y-8 min-h-screen">
       <div className="flex justify-between items-center mb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -234,7 +380,7 @@ useEffect(() => {
         </motion.button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} onKeyPress={handleKeyPress} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -313,30 +459,118 @@ useEffect(() => {
               </motion.p>
             )}
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Doctor
+            </label>
+            {!showCustomDoctor ? (
+              <select
+                name="doctor"
+                value={formData.doctor}
+                onChange={handleDoctorChange}
+                className={`w-full px-4 py-2 rounded-lg border ${errors.doctor ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200`}
+              >
+                <option value="">Select a doctor</option>
+                {doctors.map(doctor => (
+                  <option key={doctor.id} value={doctor.name}>
+                    {doctor.name}
+                  </option>
+                ))}
+                <option value="custom">Enter custom doctor name</option>
+              </select>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={customDoctorName}
+                  onChange={handleCustomDoctorChange}
+                  placeholder="Enter doctor name"
+                  className={`w-full px-4 py-2 rounded-lg border ${errors.doctor ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200`}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCustomDoctor(false);
+                    setCustomDoctorName('');
+                    setFormData(prev => ({ ...prev, doctor: '' }));
+                  }}
+                  className="text-sm text-indigo-600 hover:text-indigo-800"
+                >
+                  ← Back to dropdown
+                </button>
+              </div>
+            )}
+            {errors.doctor && (
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-1 text-sm text-red-500"
+              >
+                {errors.doctor}
+              </motion.p>
+            )}
+          </div>
         </div>
 
         <div className="border-t pt-6">
           <h3 className="text-lg font-semibold mb-4">Add Medicines</h3>
           <div className="flex gap-4 mb-4">
-            <select
-              value={currentMedicine.medicine}
-              onChange={(e) => setCurrentMedicine(prev => ({ ...prev, medicine: e.target.value }))}
-              className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              disabled={isLoading}
-            >
-              <option value="">{isLoading ? 'Loading medicines...' : 'Select Medicine'}</option>
-              {!isLoading && medicineData.map(medicine => (
-                <option 
-                  key={medicine._id} 
-                  value={medicine._id}
-                  disabled={medicine.quantity === 0}
-                >
-                  {medicine.medicineName} - {formatCurrency(medicine.price)} ({medicine.quantity} in stock)
-                </option>
-              ))}
-            </select>
-          <input
-            type="number"
+            <div className="flex-1 relative medicine-dropdown">
+              <div
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer bg-white flex justify-between items-center"
+              >
+                <span className="text-gray-700">
+                  {currentMedicine.medicine 
+                    ? filteredMedicines.find(m => m._id === currentMedicine.medicine)?.medicineName 
+                    : 'Select Medicine'}
+                </span>
+                <span className="text-gray-400">▼</span>
+              </div>
+              
+              {isDropdownOpen && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  <div className="sticky top-0 bg-white border-b border-gray-300">
+                    <input
+                      type="text"
+                      placeholder="Search medicines..."
+                      value={medicineSearch}
+                      onChange={(e) => setMedicineSearch(e.target.value)}
+                      className="w-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <div className="py-1">
+                    {isLoading ? (
+                      <div className="px-4 py-2 text-gray-500">Loading medicines...</div>
+                    ) : filteredMedicines.length === 0 ? (
+                      <div className="px-4 py-2 text-gray-500">No medicines found</div>
+                    ) : (
+                      filteredMedicines.map(medicine => (
+                        <div
+                          key={medicine._id}
+                          onClick={() => {
+                            setCurrentMedicine(prev => ({ ...prev, medicine: medicine._id }))
+                            setIsDropdownOpen(false)
+                            setMedicineSearch('')
+                          }}
+                          className={`px-4 py-2 cursor-pointer hover:bg-gray-100 ${
+                            medicine.quantity === 0 ? 'text-gray-400' : 'text-gray-700'
+                          }`}
+                          style={{ pointerEvents: medicine.quantity === 0 ? 'none' : 'auto' }}
+                        >
+                          {medicine.medicineName} - {formatCurrency(medicine.price)} ({medicine.quantity} in stock)
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <input
+              type="number"
               min="1"
               value={currentMedicine.quantity}
               onChange={(e) => setCurrentMedicine(prev => ({ ...prev, quantity: e.target.value }))}

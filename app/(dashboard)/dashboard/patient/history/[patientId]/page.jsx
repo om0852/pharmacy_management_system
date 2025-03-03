@@ -111,36 +111,117 @@ export default function PatientHistory() {
 
   const handlePrint = async (bill) => {
     setSelectedBill(bill)
-    const printWindow = window.open('', '', 'width=800,height=600')
+    const printWindow = window.open('', '', 'width=1000,height=600')
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
           <title>Bill Receipt</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .patient-info { margin-bottom: 20px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
-            .total { text-align: right; font-weight: bold; }
+            @page {
+              size: landscape;
+              margin: 20px;
+            }
+            body { 
+              font-family: Arial, sans-serif; 
+              padding: 20px;
+              margin: 0;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 30px;
+              border-bottom: 2px solid #4f46e5;
+              padding-bottom: 20px;
+            }
+            .header h1 {
+              color: #4f46e5;
+              font-size: 28px;
+              margin: 0;
+              padding: 0;
+            }
+            .header p {
+              color: #6b7280;
+              margin: 5px 0;
+            }
+            .patient-info {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 20px;
+              margin-bottom: 30px;
+              padding: 15px;
+              background-color: #f3f4f6;
+              border-radius: 8px;
+            }
+            .patient-info h3 {
+              color: #4f46e5;
+              margin-top: 0;
+            }
+            .patient-info p {
+              margin: 5px 0;
+              color: #374151;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-bottom: 20px;
+              background-color: white;
+            }
+            th {
+              background-color: #4f46e5;
+              color: white;
+              padding: 12px;
+              text-align: left;
+            }
+            td {
+              padding: 12px;
+              border-bottom: 1px solid #e5e7eb;
+            }
+            .total {
+              text-align: right;
+              font-weight: bold;
+              background-color: #f3f4f6;
+              padding: 15px;
+              border-radius: 8px;
+              margin-top: 20px;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 2px solid #4f46e5;
+              color: #6b7280;
+            }
             @media print {
               button { display: none; }
+              body { padding: 0; }
+              .header { border-bottom: 2px solid #4f46e5; }
+              .footer { border-top: 2px solid #4f46e5; }
             }
           </style>
         </head>
         <body>
           <div class="header">
-            <h2>Medical Bill Receipt</h2>
-            <p>Bill Date: ${formatDate(bill.createdAt)}</p>
+            <h1>Medicare</h1>
+            <p>Your Trusted Healthcare Partner</p>
           </div>
+          
           <div class="patient-info">
-            <h3>Patient Information</h3>
-            <p>Patient ID: ${patient.patientId}</p>
-            <p>Name: ${patient.name}</p>
-            <p>Age: ${patient.age}</p>
-            <p>Contact: ${patient.contact}</p>
+            <div>
+              <h3>Patient Information</h3>
+              <p><strong>Patient ID:</strong> ${patient.patientId}</p>
+              <p><strong>Name:</strong> ${patient.name}</p>
+              <p><strong>Age:</strong> ${patient.age}</p>
+              <p><strong>Contact:</strong> ${patient.contact}</p>
+              <p><strong>Doctor:</strong> ${patient.doctor}</p>
+            </div>
+            <div>
+              <h3>Bill Information</h3>
+              <p><strong>Bill ID:</strong> ${bill._id}</p>
+              <p><strong>Date:</strong> ${formatDate(bill.createdAt)}</p>
+              <p><strong>Status:</strong> ${bill.status}</p>
+            </div>
           </div>
+
           <table>
             <thead>
               <tr>
@@ -155,14 +236,20 @@ export default function PatientHistory() {
                 <tr>
                   <td>${med.medicineName}</td>
                   <td>${med.quantity}</td>
-                  <td>$${med.price.toFixed(2)}</td>
-                  <td>$${med.total.toFixed(2)}</td>
+                  <td>${formatCurrency(med.price)}</td>
+                  <td>${formatCurrency(med.total)}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
+
           <div class="total">
-            <p>Total Amount: $${bill.totalAmount.toFixed(2)}</p>
+            <p>Total Amount: ${formatCurrency(bill.totalAmount)}</p>
+          </div>
+
+          <div class="footer">
+            <p>Thank you for choosing Medicare</p>
+            <p>For any queries, please contact us at: support@medicare.com</p>
           </div>
         </body>
       </html>
@@ -172,6 +259,93 @@ export default function PatientHistory() {
     printWindow.print()
     printWindow.close()
   }
+
+  const handleDownload = async (bill) => {
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Add Medicare header
+    doc.setFontSize(24);
+    doc.setTextColor(79, 70, 229); // #4f46e5
+    doc.text('Medicare', 140, 20, { align: 'center' });
+    doc.setFontSize(12);
+    doc.setTextColor(107, 114, 128); // #6b7280
+    doc.text('Your Trusted Healthcare Partner', 140, 28, { align: 'center' });
+
+    // Add patient information
+    doc.setFontSize(14);
+    doc.setTextColor(79, 70, 229);
+    doc.text('Patient Information', 20, 45);
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Patient ID: ${patient.patientId}`, 20, 55);
+    doc.text(`Name: ${patient.name}`, 20, 62);
+    doc.text(`Age: ${patient.age}`, 20, 69);
+    doc.text(`Contact: ${patient.contact}`, 20, 76);
+    doc.text(`Doctor: ${patient.doctor}`, 20, 83);
+
+    // Add bill information
+    doc.setFontSize(14);
+    doc.setTextColor(79, 70, 229);
+    doc.text('Bill Information', 140, 45);
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Bill ID: ${bill._id}`, 140, 55);
+    doc.text(`Date: ${formatDate(bill.createdAt)}`, 140, 62);
+    doc.text(`Status: ${bill.status}`, 140, 69);
+
+    // Add medicines table
+    const tableData = bill.medicines.map(med => [
+      med.medicineName,
+      med.quantity.toString(),
+      formatCurrency(med.price),
+      formatCurrency(med.total)
+    ]);
+
+    // Add total row
+    tableData.push(['', '', 'Total Amount:', formatCurrency(bill.totalAmount)]);
+
+    doc.autoTable({
+      startY: 95,
+      head: [['Medicine', 'Quantity', 'Price', 'Total']],
+      body: tableData,
+      headStyles: {
+        fillColor: [79, 70, 229],
+        textColor: 255,
+        fontSize: 10,
+        fontStyle: 'bold'
+      },
+      styles: {
+        fontSize: 10,
+        cellPadding: 5
+      },
+      columnStyles: {
+        0: { cellWidth: 80 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 40 }
+      },
+      footStyles: {
+        fillColor: [243, 244, 246],
+        textColor: 0,
+        fontSize: 10,
+        fontStyle: 'bold'
+      }
+    });
+
+    // Add footer
+    const pageHeight = doc.internal.pageSize.height;
+    doc.setFontSize(10);
+    doc.setTextColor(107, 114, 128);
+    doc.text('Thank you for choosing Medicare', 140, pageHeight - 20, { align: 'center' });
+    doc.text('For any queries, please contact us at: support@medicare.com', 140, pageHeight - 15, { align: 'center' });
+
+    // Download the PDF
+    doc.save(`bill-${bill._id}.pdf`);
+  };
 
   if (loading) {
     return (

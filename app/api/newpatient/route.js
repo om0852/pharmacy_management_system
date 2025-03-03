@@ -13,171 +13,65 @@ const transporter = nodemailer.createTransport({
 
 export async function POST(request) {
   try {
-    await connectDB();
-    const data = await request.json();
-    const {
-      patientId,
-      name,
-      age,
-      contact,
-      medicines,
-      totalBill,
-      email,
-      address
-    } = data;
+    const body = await request.json();
+    const { patientId, name, age, contact, doctor, medicines, totalBill } = body;
 
-    // Check for duplicate contact number
-    const existingPatient = await models.Patient.findOne({ contact });
-    if (existingPatient) {
+    // Validate required fields
+    if (!patientId || !name || !age || !contact || !doctor || !medicines || !totalBill) {
       return NextResponse.json(
-        { error: 'A patient with this contact number already exists' },
+        { error: 'All fields are required' },
         { status: 400 }
       );
     }
 
-    // Check stock availability for all medicines
-    const stockChecks = await Promise.all(medicines.map(async (med) => {
-      const medicineInDb = await models.MedicineInventory.findById(med.id);
-      if (!medicineInDb) {
-        throw new Error(`Medicine ${med.name} not found`);
-      }
-      if (medicineInDb.quantity < med.quantity) {
-        throw new Error(`Insufficient stock for ${med.name}. Only ${medicineInDb.quantity} available`);
-      }
-      return medicineInDb;
-    }));
+    // Connect to database
+    await connectDB();
 
-    // Create new patient with bill and medicines
+    // Create new patient with doctor field
     const patient = new models.Patient({
       patientId,
       name,
-      age,
+      age: parseInt(age),
       contact,
-      email,
-      address,
+      doctor,
       bills: [{
         medicines: medicines.map(med => ({
           medicineName: med.name,
-          quantity: parseInt(med.quantity),
-          price: parseFloat(med.price),
-          total: parseFloat(med.total)
+          quantity: med.quantity,
+          price: med.price,
+          total: med.total
         })),
-        totalAmount: parseFloat(totalBill),
+        totalAmount: totalBill,
         status: 'Paid'
       }]
     });
 
-    // Save the patient
+    // Save patient
     await patient.save();
 
-    // Update stock levels
-    const stockUpdates = medicines.map(async (med) => {
-      const medicine = await models.MedicineInventory.findById(med.id);
-      medicine.quantity -= parseInt(med.quantity);
-      await medicine.save();
-
-      let alerts = [];
-
-      // Check if medicine is out of stock
-      if (medicine.quantity === 0) {
-        alerts.push({
-          type: 'out_of_stock',
-          medicine: medicine
-        });
-        // Delete medicine if stock is zero
-        await models.MedicineInventory.findByIdAndDelete(medicine._id);
-      }
-      // Check if stock is low
-      else if (medicine.quantity <= 10) {
-        alerts.push({
-          type: 'low_stock',
-          medicine: medicine
-        });
+    // Update medicine stock
+    for (const medicine of medicines) {
+      const medicineDoc = await models.MedicineInventory.findById(medicine.id);
+      if (!medicineDoc) {
+        throw new Error(`Medicine not found: ${medicine.name}`);
       }
 
-      // Check if medicine is expiring within a month
-      const oneMonthFromNow = new Date();
-      oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
-      if (medicine.expiryDate <= oneMonthFromNow) {
-        alerts.push({
-          type: 'expiring',
-          medicine: medicine
-        });
+      if (medicineDoc.quantity < medicine.quantity) {
+        throw new Error(`Insufficient stock for ${medicine.name}`);
       }
 
-      return alerts;
-    });
-
-    const allAlerts = (await Promise.all(stockUpdates)).flat();
-
-    // Send email if there are any alerts
-    if (allAlerts.length > 0) {
-      const outOfStockMeds = allAlerts
-        .filter(alert => alert.type === 'out_of_stock')
-        .map(alert => alert.medicine);
-
-      const lowStockMeds = allAlerts
-        .filter(alert => alert.type === 'low_stock')
-        .map(alert => alert.medicine);
-
-      const expiringMeds = allAlerts
-        .filter(alert => alert.type === 'expiring')
-        .map(alert => alert.medicine);
-
-      let emailContent = '<h2>Medical Inventory Alert</h2>';
-
-      if (outOfStockMeds.length > 0) {
-        emailContent += `
-          <h3>Out of Stock Alert</h3>
-          <p>The following items are now out of stock and have been removed from inventory:</p>
-          <ul>
-            ${outOfStockMeds.map(med => `
-              <li>${med.medicineName} - Removed from inventory</li>
-            `).join('')}
-          </ul>
-        `;
-      }
-
-      if (lowStockMeds.length > 0) {
-        emailContent += `
-          <h3>Low Stock Alert</h3>
-          <p>The following items are running low on stock:</p>
-          <ul>
-            ${lowStockMeds.map(med => `
-              <li>${med.medicineName} - Only ${med.quantity} units remaining</li>
-            `).join('')}
-          </ul>
-        `;
-      }
-
-      if (expiringMeds.length > 0) {
-        emailContent += `
-          <h3>Expiring Stock Alert</h3>
-          <p>The following items are expiring within a month:</p>
-          <ul>
-            ${expiringMeds.map(med => `
-              <li>${med.medicineName} - Expires on ${new Date(med.expiryDate).toLocaleDateString()}</li>
-            `).join('')}
-          </ul>
-        `;
-      }
-
-      await transporter.sendMail({
-        from: 'smartcoder0852@gmail.com',
-        to: 'salunkeom474@gmail.com',
-        subject: 'Medical Inventory Alert - Action Required',
-        html: emailContent
-      });
+      medicineDoc.quantity -= medicine.quantity;
+      await medicineDoc.save();
     }
 
-    return NextResponse.json({
-      message: 'Patient created successfully',
-      patient
-    }, { status: 201 });
+    return NextResponse.json(
+      { message: 'Patient created successfully', patient },
+      { status: 201 }
+    );
 
   } catch (error) {
     console.error('Error creating patient:', error);
-    
+
     if (error.message.includes('Insufficient stock') || error.message.includes('Medicine not found')) {
       return NextResponse.json(
         { error: error.message },
@@ -185,20 +79,10 @@ export async function POST(request) {
       );
     }
 
-    // Handle validation errors
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(err => err.message);
-      return NextResponse.json(
-        { error: 'Validation failed', details: validationErrors },
-        { status: 400 }
-      );
-    }
-
-    // Handle duplicate key errors
     if (error.code === 11000) {
       return NextResponse.json(
         { error: 'Patient ID already exists' },
-        { status: 409 }
+        { status: 400 }
       );
     }
 

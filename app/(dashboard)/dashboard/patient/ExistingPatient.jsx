@@ -21,6 +21,18 @@ export default function ExistingPatient() {
   const [medicines, setMedicines] = useState([])
   const [searchResults, setSearchResults] = useState([])
   const [showSuccess, setShowSuccess] = useState(false)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [medicineSearch, setMedicineSearch] = useState('')
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [showCustomDoctor, setShowCustomDoctor] = useState(false)
+  const [customDoctorName, setCustomDoctorName] = useState('')
+  const [doctor, setDoctor] = useState('')
+
+  const doctors = [
+    { id: 'dr1', name: 'Dr. John Smith' },
+    { id: 'dr2', name: 'Dr. Sarah Johnson' },
+    { id: 'dr3', name: 'Dr. Michael Brown' },
+  ]
 
   const router = useRouter()
 
@@ -135,6 +147,10 @@ export default function ExistingPatient() {
       setErrors({ medicines: 'Please add at least one medicine' })
       return
     }
+    if (!doctor) {
+      setErrors({ doctor: 'Please select or enter a doctor' })
+      return
+    }
 
     try {
       setLoading(true)
@@ -143,6 +159,7 @@ export default function ExistingPatient() {
         name: selectedPatient.name,
         age: selectedPatient.age,
         contact: selectedPatient.contact,
+        doctor: doctor,
         medicines: selectedMedicines.map(med => ({
           id: med.id,
           medicineName: med.medicineName,
@@ -160,6 +177,9 @@ export default function ExistingPatient() {
       // Clear form
       setSelectedMedicines([])
       setCurrentMedicine({ medicine: '', quantity: 1 })
+      setDoctor('')
+      setCustomDoctorName('')
+      setShowCustomDoctor(false)
       
       // Refresh medicine data
       await fetchMedicines()
@@ -231,8 +251,81 @@ export default function ExistingPatient() {
     }).format(amount)
   }
 
+  const handleKeyDown = (e) => {
+    if (!isDropdownOpen) return
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        setSelectedIndex(prev => 
+          prev < filteredMedicines.length - 1 ? prev + 1 : prev
+        )
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        setSelectedIndex(prev => prev > 0 ? prev - 1 : prev)
+        break
+      case 'Enter':
+        e.preventDefault()
+        if (filteredMedicines[selectedIndex] && filteredMedicines[selectedIndex].quantity > 0) {
+          setCurrentMedicine(prev => ({ 
+            ...prev, 
+            medicine: filteredMedicines[selectedIndex]._id 
+          }))
+          setIsDropdownOpen(false)
+          setMedicineSearch('')
+          setSelectedIndex(0)
+        }
+        break
+      case 'Escape':
+        e.preventDefault()
+        setIsDropdownOpen(false)
+        setMedicineSearch('')
+        setSelectedIndex(0)
+        break
+    }
+  }
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isDropdownOpen && !event.target.closest('.medicine-dropdown')) {
+        setIsDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isDropdownOpen])
+
+  const filteredMedicines = medicines.filter(medicine => 
+    medicine.medicineName.toLowerCase().includes(medicineSearch.toLowerCase())
+  )
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleSearch()
+    }
+  }
+
+  const handleDoctorChange = (e) => {
+    const value = e.target.value;
+    if (value === 'custom') {
+      setShowCustomDoctor(true);
+      setDoctor('');
+    } else {
+      setShowCustomDoctor(false);
+      setCustomDoctorName('');
+      setDoctor(value);
+    }
+  };
+
+  const handleCustomDoctorChange = (e) => {
+    setCustomDoctorName(e.target.value);
+    setDoctor(e.target.value);
+  };
+
   return (
-    <div className="bg-white shadow-lg rounded-2xl p-6 space-y-8">
+    <div className="bg-white shadow-lg rounded-2xl p-8 space-y-8 min-h-screen">
       <div className="flex justify-between items-center mb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -262,6 +355,7 @@ export default function ExistingPatient() {
             placeholder="Search by Patient ID or Contact Number"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyPress={handleKeyPress}
             className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
           <motion.button
@@ -293,20 +387,72 @@ export default function ExistingPatient() {
               className="bg-gray-50 p-4 rounded-lg space-y-4"
             >
               <div className="flex justify-between items-center">
-        <div>
+                <div>
                   <h3 className="text-lg font-semibold">{selectedPatient.name}</h3>
                   <p className="text-sm text-gray-600">ID: {selectedPatient.id}</p>
                   <p className="text-sm text-gray-600">Contact: {selectedPatient.contact}</p>
                   <p className="text-sm text-gray-600">Age: {selectedPatient.age}</p>
-        </div>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                   onClick={handleViewHistory}
                   className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200"
                 >
                   View History
                 </motion.button>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Doctor
+                </label>
+                {!showCustomDoctor ? (
+                  <select
+                    name="doctor"
+                    value={doctor}
+                    onChange={handleDoctorChange}
+                    className={`w-full px-4 py-2 rounded-lg border ${errors.doctor ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200`}
+                  >
+                    <option value="">Select a doctor</option>
+                    {doctors.map(doctor => (
+                      <option key={doctor.id} value={doctor.name}>
+                        {doctor.name}
+                      </option>
+                    ))}
+                    <option value="custom">Enter custom doctor name</option>
+                  </select>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={customDoctorName}
+                      onChange={handleCustomDoctorChange}
+                      placeholder="Enter doctor name"
+                      className={`w-full px-4 py-2 rounded-lg border ${errors.doctor ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCustomDoctor(false);
+                        setCustomDoctorName('');
+                        setDoctor('');
+                      }}
+                      className="text-sm text-indigo-600 hover:text-indigo-800"
+                    >
+                      ← Back to dropdown
+                    </button>
+                  </div>
+                )}
+                {errors.doctor && (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="mt-1 text-sm text-red-500"
+                  >
+                    {errors.doctor}
+                  </motion.p>
+                )}
               </div>
 
               <AnimatePresence>
@@ -347,18 +493,80 @@ export default function ExistingPatient() {
           <div className="border-t pt-6">
             <h3 className="text-lg font-semibold mb-4">Add Medicines</h3>
             <div className="flex gap-4 mb-4">
-              <select
-                value={currentMedicine.medicine}
-                onChange={(e) => setCurrentMedicine(prev => ({ ...prev, medicine: e.target.value }))}
-                className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              >
-                <option value="">Select Medicine</option>
-                {medicines.map(medicine => (
-                  <option key={medicine._id} value={medicine._id}>
-                    {medicine.medicineName} - {formatCurrency(medicine.price)}
-                  </option>
-                ))}
-              </select>
+              <div className="flex-1 relative medicine-dropdown">
+                <div
+                  onClick={() => {
+                    setIsDropdownOpen(!isDropdownOpen)
+                    if (!isDropdownOpen) {
+                      setSelectedIndex(0)
+                    }
+                  }}
+                  className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer bg-white flex justify-between items-center"
+                >
+                  <span className="text-gray-700">
+                    {currentMedicine.medicine 
+                      ? filteredMedicines.find(m => m._id === currentMedicine.medicine)?.medicineName 
+                      : 'Select Medicine'}
+                  </span>
+                  <span className="text-gray-400">▼</span>
+                </div>
+                
+                {isDropdownOpen && (
+                  <div 
+                    className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-[400px] overflow-y-auto"
+                    onKeyDown={handleKeyDown}
+                  >
+                    <div className="sticky top-0 bg-white border-b border-gray-300">
+                      <input
+                        type="text"
+                        placeholder="Search medicines..."
+                        value={medicineSearch}
+                        onChange={(e) => {
+                          setMedicineSearch(e.target.value)
+                          setSelectedIndex(0)
+                        }}
+                        className="w-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    <div className="py-1">
+                      {loading ? (
+                        <div className="px-4 py-2 text-gray-500">Loading medicines...</div>
+                      ) : filteredMedicines.length === 0 ? (
+                        <div className="px-4 py-2 text-gray-500">No medicines found</div>
+                      ) : (
+                        filteredMedicines.map((medicine, index) => (
+                          <div
+                            key={medicine._id}
+                            onClick={() => {
+                              if (medicine.quantity > 0) {
+                                setCurrentMedicine(prev => ({ ...prev, medicine: medicine._id }))
+                                setIsDropdownOpen(false)
+                                setMedicineSearch('')
+                                setSelectedIndex(0)
+                              }
+                            }}
+                            className={`px-4 py-2 cursor-pointer hover:bg-gray-100 ${
+                              medicine.quantity === 0 ? 'text-gray-400' : 'text-gray-700'
+                            } ${
+                              index === selectedIndex ? 'bg-indigo-50' : ''
+                            }`}
+                            style={{ pointerEvents: medicine.quantity === 0 ? 'none' : 'auto' }}
+                          >
+                            <div className="flex justify-between items-center">
+                              <span>{medicine.medicineName}</span>
+                              <span className="text-sm text-gray-500">
+                                {formatCurrency(medicine.price)} ({medicine.quantity} in stock)
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
               <input
                 type="number"
                 min="1"
