@@ -96,6 +96,103 @@ export default function NewPatient() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    
+    // If showSuccess is true, we just want to download the bill again
+    if (showSuccess) {
+      const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Add Medicare header
+      doc.setFontSize(24);
+      doc.setTextColor(79, 70, 229);
+      doc.text('Medicare', 140, 20, { align: 'center' });
+      doc.setFontSize(12);
+      doc.setTextColor(107, 114, 128);
+      doc.text('Your Trusted Healthcare Partner', 140, 28, { align: 'center' });
+
+      // Add patient information
+      doc.setFontSize(14);
+      doc.setTextColor(79, 70, 229);
+      doc.text('Patient Information', 20, 45);
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Patient ID: ${formData.patientId}`, 20, 55);
+      doc.text(`Name: ${formData.name}`, 20, 62);
+      doc.text(`Age: ${formData.age}`, 20, 69);
+      doc.text(`Contact: ${formData.contact}`, 20, 76);
+      doc.text(`Doctor: ${formData.doctor}`, 20, 83);
+
+      // Add bill information
+      doc.setFontSize(14);
+      doc.setTextColor(79, 70, 229);
+      doc.text('Bill Information', 140, 45);
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Bill ID: ${formData.patientId}`, 140, 55);
+      doc.text(`Date: ${new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })}`, 140, 62);
+      doc.text('Status: Paid', 140, 69);
+
+      // Add medicines table
+      const tableData = selectedMedicines.map(med => [
+        med.name,
+        med.quantity.toString(),
+        formatCurrency(med.price),
+        formatCurrency(med.total)
+      ]);
+
+      // Add total row
+      tableData.push(['', '', 'Total Amount:', formatCurrency(calculateTotal())]);
+
+      doc.autoTable({
+        startY: 95,
+        head: [['Medicine', 'Quantity', 'Price', 'Total']],
+        body: tableData,
+        headStyles: {
+          fillColor: [79, 70, 229],
+          textColor: 255,
+          fontSize: 10,
+          fontStyle: 'bold'
+        },
+        styles: {
+          fontSize: 10,
+          cellPadding: 5
+        },
+        columnStyles: {
+          0: { cellWidth: 80 },
+          1: { cellWidth: 30 },
+          2: { cellWidth: 40 },
+          3: { cellWidth: 40 }
+        },
+        footStyles: {
+          fillColor: [243, 244, 246],
+          textColor: 0,
+          fontSize: 10,
+          fontStyle: 'bold'
+        }
+      });
+
+      // Add footer
+      const pageHeight = doc.internal.pageSize.height;
+      doc.setFontSize(10);
+      doc.setTextColor(107, 114, 128);
+      doc.text('Thank you for choosing Medicare', 140, pageHeight - 20, { align: 'center' });
+      doc.text('For any queries, please contact us at: support@medicare.com', 140, pageHeight - 15, { align: 'center' });
+
+      // Download the PDF
+      doc.save(`bill-${formData.patientId}.pdf`);
+      return;
+    }
+
+    // Regular form submission for new patient registration
     if (validateForm()) {
       console.log('New patient submitted', {
         ...formData,
@@ -655,7 +752,7 @@ export default function NewPatient() {
             type="submit"
             className="flex-1 py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
           >
-            Register Patient and Generate Bill
+            {showSuccess ? 'Download Bill' : 'Register Patient and Generate Bill'}
           </motion.button>
 
           {showSuccess && (
