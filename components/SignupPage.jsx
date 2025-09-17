@@ -1,19 +1,16 @@
 "use client"
 import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { toast } from "react-hot-toast"
-import SignupBox from "@/components/SignupPage" // import your SignupPage component
 
-export default function LoginPage() {
-  const router = useRouter()
+export default function SignupPage({ onClose }) {  const router = useRouter()
   const [formData, setFormData] = useState({
     email: "",
     password: ""
   })
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
-  const [showSignup, setShowSignup] = useState(false) // toggle signup
 
   const validateForm = () => {
     const newErrors = {}
@@ -37,20 +34,19 @@ export default function LoginPage() {
 
     setIsLoading(true)
 
-    // Compare with localStorage credentials
-    const storedUser = JSON.parse(localStorage.getItem("user") || "{}")
+    localStorage.setItem(
+      "user",
+      JSON.stringify({
+        email: formData.email,
+        password: formData.password
+      })
+    )
 
-    if (
-      storedUser.email === formData.email &&
-      storedUser.password === formData.password
-    ) {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      router.push("/dashboard")
-    } else {
-      toast.error("Invalid email or password")
-    }
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    toast.success("Signup successful! Please login.")
 
     setIsLoading(false)
+    if (onClose) onClose() // close signup box
   }
 
   const handleInputChange = (e) => {
@@ -68,18 +64,18 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 flex items-center justify-center p-4 relative">
-      <motion.div
-        initial={{ opacity: 0, y: -50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, type: "spring", stiffness: 100 }}
-        className="bg-white/80 backdrop-blur-sm p-8 rounded-2xl shadow-xl w-full max-w-md"
-      >
+    <div className="min-h-screen bg-gradient-to-br from-green-100 via-teal-50 to-blue-100 flex items-center justify-center p-4">
+     <motion.div
+      initial={{ y: -50, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 50, opacity: 0 }}
+      className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md"
+    >
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            Welcome Back
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent">
+            Create Account
           </h1>
-          <p className="text-gray-600 mt-2">Sign in to your account</p>
+          <p className="text-gray-600 mt-2">Sign up to get started</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -94,7 +90,7 @@ export default function LoginPage() {
               onChange={handleInputChange}
               className={`w-full px-4 py-2 rounded-lg border ${
                 errors.email ? "border-red-500" : "border-gray-300"
-              } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm`}
+              } focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm`}
               placeholder="Enter your email"
             />
             {errors.email && (
@@ -113,7 +109,7 @@ export default function LoginPage() {
               onChange={handleInputChange}
               className={`w-full px-4 py-2 rounded-lg border ${
                 errors.password ? "border-red-500" : "border-gray-300"
-              } focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm`}
+              } focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white/50 backdrop-blur-sm`}
               placeholder="Enter your password"
             />
             {errors.password && (
@@ -126,38 +122,12 @@ export default function LoginPage() {
             whileTap={{ scale: 0.95 }}
             type="submit"
             disabled={isLoading}
-            className="relative w-full py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 disabled:opacity-70"
+            className="relative w-full py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all duration-200 disabled:opacity-70"
           >
-            {isLoading ? "Signing in..." : "Sign In"}
+            {isLoading ? "Creating account..." : "Sign Up"}
           </motion.button>
         </form>
-
-        {/* Sign up button */}
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => setShowSignup(true)}
-            className="text-indigo-600 hover:underline"
-          >
-            Don’t have an account? Sign Up
-          </button>
-        </div>
       </motion.div>
-
-      {/* AnimatePresence for signup modal */}
-      <AnimatePresence>
-        {showSignup && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          >
-            <SignupBox
-              onClose={() => setShowSignup(false)} // close on submit
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   )
 }
