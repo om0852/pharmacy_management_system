@@ -121,6 +121,7 @@ export default function LoginPage() {
             )}
           </div>
 
+          {/* Normal Sign In Button */}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.95 }}
@@ -129,6 +130,17 @@ export default function LoginPage() {
             className="relative w-full py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 disabled:opacity-70"
           >
             {isLoading ? "Signing in..." : "Sign In"}
+          </motion.button>
+
+          {/* Login as Patient Button */}
+          <motion.button
+            type="button"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => toast("🚧 Login as Patient is coming soon!", { icon: "⏳" })}
+            className="relative w-full py-3 px-4 border rounded-lg shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
+          >
+            Login as Patient
           </motion.button>
         </form>
 
